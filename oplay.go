@@ -7,22 +7,44 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/go-gst/go-glib/glib"
-	"github.com/go-gst/go-gst/examples"
 	"github.com/go-gst/go-gst/gst"
 )
 
+// Run is used to wrap the given function in a main loop and print any error
+func run(f func() error) {
+	mainLoop := glib.NewMainLoop(glib.MainContextDefault(), false)
+
+	go func() {
+		if err := f(); err != nil {
+			fmt.Println("ERROR!", err)
+		}
+		mainLoop.Quit()
+	}()
+
+	mainLoop.Run()
+}
+
+// RunLoop is used to wrap the given function in a main loop and print any error.
+// The main loop itself is passed to the function for more control over exiting.
+func runLoop(f func(*glib.MainLoop) error) {
+	mainLoop := glib.NewMainLoop(glib.MainContextDefault(), false)
+
+	if err := f(mainLoop); err != nil {
+		fmt.Println("ERROR!", err)
+	}
+}
+
 func runPipeline(mainLoop *glib.MainLoop) error {
-	if len(os.Args) == 1 {
-		return errors.New("pipeline string cannot be empty")
+	if len(os.Args) != 2 {
+		return errors.New("We expecte 1 argument which is the location of a flac audio file. You failed to provide.")
 	}
 
 	gst.Init(&os.Args)
 
 	// Let GStreamer create a pipeline from the parsed launch syntax on the cli.
-	pipeline, err := gst.NewPipelineFromString(strings.Join(os.Args[1:], " "))
+	pipeline, err := gst.NewPipelineFromString("filesrc location =" + os.Args[1] + " ! flacparse ! flacdec ! pipewiresink")
 	if err != nil {
 		return err
 	}
@@ -41,9 +63,19 @@ func runPipeline(mainLoop *glib.MainLoop) error {
 			}
 			mainLoop.Quit()
 		default:
-			// All messages implement a Stringer. However, this is
-			// typically an expensive thing to do and should be avoided.
-			fmt.Println(msg)
+			tag := msg.ParseTags()
+			playingNow := ""
+			if tag != nil {
+				myTrack, status := tag.GetString(gst.TagTitle)
+				if status == true {
+					playingNow = playingNow + "'" + myTrack + "'"
+				}
+				myArtist, status := tag.GetString(gst.TagArtist)
+				if status == true {
+					playingNow = playingNow + " by: " + myArtist
+				}
+			}
+			fmt.Println(playingNow)
 		}
 		return true
 	})
@@ -56,7 +88,7 @@ func runPipeline(mainLoop *glib.MainLoop) error {
 }
 
 func main() {
-	examples.RunLoop(func(loop *glib.MainLoop) error {
+	runLoop(func(loop *glib.MainLoop) error {
 		return runPipeline(loop)
 	})
 }
