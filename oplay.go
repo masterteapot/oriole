@@ -44,7 +44,7 @@ func runPipeline(mainLoop *glib.MainLoop) error {
 	gst.Init(&os.Args)
 
 	// Let GStreamer create a pipeline from the parsed launch syntax on the cli.
-	pipeline, err := gst.NewPipelineFromString("filesrc location =" + os.Args[1] + " ! flacparse ! flacdec ! pipewiresink")
+	pipeline, err := gst.NewPipelineFromString("uridecodebin3 uri=file://" + os.Args[1] + " ! autoaudiosink")
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func runPipeline(mainLoop *glib.MainLoop) error {
 				fmt.Println("DEBUG:", debug)
 			}
 			mainLoop.Quit()
-		default:
+		case gst.MessageTag:
 			tag := msg.ParseTags()
 			playingNow := ""
 			if tag != nil {
@@ -76,7 +76,10 @@ func runPipeline(mainLoop *glib.MainLoop) error {
 				}
 			}
 			fmt.Println(playingNow)
-		}
+			return true
+		default:
+			return true
+	}
 		return true
 	})
 
