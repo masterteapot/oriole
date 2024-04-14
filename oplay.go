@@ -79,7 +79,7 @@ func runPipeline(mainLoop *glib.MainLoop) error {
 			return true
 		default:
 			return true
-	}
+		}
 		return true
 	})
 
